@@ -2,88 +2,139 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 
-# Konfigurasi UI
-st.set_page_config(page_title="BIG Premium System", layout="centered")
+# 1. Konfigurasi UI & Tema Premium
+st.set_page_config(page_title="BIG Smart System", layout="centered")
 
-# CSS untuk UI Slate & Indigo yang Premium
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
-    .stTabs [aria-selected="true"] { background-color: #6366F1 !important; color: white !important; }
-    .profile-img { 
-        border-radius: 50%; 
-        object-fit: cover; 
-        border: 4px solid #6366F1;
-        margin-bottom: 20px;
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+        background-color: #F8FAFC;
     }
-    .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+    
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px;
+        background-color: #F1F5F9;
+        padding: 5px;
+        border-radius: 12px;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 8px;
+        padding: 10px 20px;
+        color: #64748B;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background-color: #4F46E5 !important;
+        color: white !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .profile-card {
+        background: white;
+        padding: 2rem;
+        border-radius: 20px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05);
+        border: 1px solid #E2E8F0;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .profile-img {
+        border-radius: 50%;
+        border: 4px solid #6366F1;
+        object-fit: cover;
+        margin-bottom: 1rem;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# Integrasi Google Sheets
+# 2. Integrasi Google Sheets
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1yzQzxJcTef2pHaKHSxZroFdmgTxR3BRZrSSl_ntuHMM/edit?usp=sharing"
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-@st.cache_data(ttl=2)
-def load_live_data():
-    return conn.read(spreadsheet=SHEET_URL)
+@st.cache_data(ttl=5)
+def load_data():
+    df = conn.read(spreadsheet=SHEET_URL)
+    # Bersihkan No_KP
+    df['No_KP'] = df['No_KP'].astype(str).str.split('.').str[0].str.strip()
+    return df
 
-df = load_live_data()
+df = load_data()
 
-st.markdown("<h1 style='text-align: center; color: #1E293B;'>🏕️ BIG Management System</h1>", unsafe_allow_html=True)
+# --- HEADER ---
+st.markdown("<h1 style='text-align: center; color: #1E293B; margin-bottom:0;'>🏕️ BIG INTEGRATED SYSTEM</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #6366F1; font-weight:600;'>KURSUS MPU3212/MPU3411</p>", unsafe_allow_html=True)
 
-tab1, tab2 = st.tabs(["👤 Mod Pelajar", "🎓 Mod Pensyarah"])
+tab1, tab2 = st.tabs(["👤 MOD PELAJAR", "🎓 MOD PENSYARAH"])
 
 # --- MOD PELAJAR ---
 with tab1:
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    ic_input = st.text_input("No. Kad Pengenalan untuk Akses")
-    
+    st.write("### Sila masukkan No. KP untuk kemaskini profil")
+    ic_input = st.text_input("No. Kad Pengenalan", placeholder="Contoh: 060214020918").strip()
+
     if ic_input:
-        # Bersihkan format IC
-        df['No_KP'] = df['No_KP'].astype(str).str.split('.').str[0].str.strip()
-        match = df[df['No_KP'] == ic_input.strip()]
+        match = df[df['No_KP'] == ic_input]
         
         if not match.empty:
             idx = match.index[0]
-            pelajar = match.iloc[0]
+            p = match.iloc[0]
 
-            # --- PAPARAN GAMBAR PELAJAR ---
-            col_img, col_info = st.columns([1, 2])
-            with col_img:
-                if pd.notna(pelajar['Url Gambar']) and str(pelajar['Url Gambar']).startswith('http'):
-                    st.image(pelajar['Url Gambar'], width=150, caption="Gambar Profil")
-                else:
-                    st.image("https://via.placeholder.com/150", width=150, caption="Tiada Gambar")
+            # PAPARAN KAD PROFIL PREMIUM
+            st.markdown("<div class='profile-card'>", unsafe_allow_html=True)
             
-            with col_info:
-                st.subheader(pelajar['Nama_Pelajar'])
-                st.write(f"ID: {pelajar['ID_SISTEM']} | Kelas: {pelajar['Kelas']}")
+            # Tunjukkan gambar pelajar
+            url_gambar = p['Url Gambar'] if pd.notna(p['Url Gambar']) else "https://via.placeholder.com/150"
+            st.image(url_gambar, width=120)
+            
+            st.markdown(f"<h2 style='margin:10px 0 5px 0;'>{p['Nama_Pelajar']}</h2>", unsafe_allow_html=True)
+            st.markdown(f"<p style='color:#64748B;'>{p['Kelas']} | {p['No_KP']}</p>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 
-            # Form Update
-            with st.form("form_update_pelajar"):
-                siri = st.selectbox("SIRI BIG", [2, 3, 4], index=0)
-                kump = st.selectbox("KUMPULAN BIG", ["Grey", "Jingga", "Kuning", "Ungu", "Biru Gelap", "Biru", "Pink", "Coklat", "Merah", "Hijau"])
-                no_k = st.number_input("No Dalam Kumpulan", 1, 30, value=1)
-                alah = st.text_input("Alahan", value=str(pelajar['Alahan'] or ""))
-                tel = st.text_input("No tel Kecemasan", value=str(pelajar['No tel Kecemasan'] or ""))
+            
+
+            # BORANG KEMASKINI
+            with st.form("update_form"):
+                c1, c2 = st.columns(2)
+                with c1:
+                    siri = st.selectbox("SIRI BIG", [2, 3, 4], index=0)
+                    kump = st.selectbox("KUMPULAN BIG", ["Grey", "Jingga", "Kuning", "Ungu", "Biru Gelap", "Biru", "Pink", "Coklat", "Merah", "Hijau"])
+                with c2:
+                    no_k = st.number_input("No Dalam Kumpulan", 1, 30, value=1)
+                    tel = st.text_input("No Tel Kecemasan", value=str(p['No tel Kecemasan'] or ""))
                 
-                if st.form_submit_button("Kemaskini Profil Sekarang"):
+                alah = st.text_input("Alahan / Masalah Kesihatan", value=str(p['Alahan'] or ""))
+                ubat = st.text_input("Ubat-Ubatan", value=str(p['Ubat-Ubatan'] or ""))
+
+                if st.form_submit_button("KEMASKINI PROFIL"):
                     df.at[idx, 'SIRI BIG'] = siri
                     df.at[idx, 'KUMPULAN BIG'] = kump
                     df.at[idx, 'No Dalam Kumpulan'] = no_k
                     df.at[idx, 'Alahan'] = alah
+                    df.at[idx, 'Ubat-Ubatan'] = ubat
                     df.at[idx, 'No tel Kecemasan'] = tel
                     
                     conn.update(spreadsheet=SHEET_URL, data=df)
-                    st.success("Berjaya! Data anda telah dikemaskini secara Live.")
+                    st.balloons()
+                    st.success("Data anda telah disimpan ke dalam Google Sheets secara LIVE!")
                     st.cache_data.clear()
         else:
-            st.error("No. KP tidak ditemui.")
-    st.markdown("</div>", unsafe_allow_html=True)
+            st.error("Ralat: No. KP tidak dijumpai dalam sistem.")
 
-# --- MOD PENSYARAH (SAMA SEPERTI SEBELUM INI) ---
+# --- MOD PENSYARAH ---
 with tab2:
-    # ... Kod Pensyarah yang memaparkan gambar juga ...
-    st.info("Log masuk di sidebar untuk akses pensyarah.")
+    st.sidebar.markdown("### Kawalan Pensyarah")
+    pwd = st.sidebar.text_input("Kata Laluan", type="password")
+    
+    if pwd == "BIG2026":
+        st.subheader("Carian & Pemarkahan")
+        kod = st.text_input("Imbas/Taip Kod Kumpulan (Cth: C3)").upper()
+        
+        # Logik carian kod kumpulan yang sama...
+        # Paparkan gambar pelajar juga di sini supaya pensyarah kenal pelajar tersebut
+        st.info("Pilih pelajar untuk mula memberikan markah Merit/Demerit.")
+    else:
+        st.warning("Sila masukkan kata laluan di bar sisi.")
