@@ -1,87 +1,88 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Sistem BIG v5.0", layout="centered")
+st.set_page_config(page_title="Sistem BIG v6.0", layout="centered")
 
-# --- 1. MUAT DATA ---
+# 1. LOAD DATA
 @st.cache_data
 def load_data():
     try:
-        # Kita baca fail CSV anda
         df = pd.read_csv('data.csv', dtype=str)
-        # Kita bersihkan No_KP supaya hanya tinggal nombor bulat
-        df['No_KP'] = df['No_KP'].str.split('.').str[0].str.strip()
+        # Bersihkan No_KP: Ambil 12 angka sahaja, buang .0
+        df['No_KP'] = df['No_KP'].astype(str).apply(lambda x: x.split('.')[0].strip())
         return df
     except Exception as e:
-        st.error(f"Gagal membaca fail: {e}")
+        st.error(f"Ralat: Fail 'data.csv' tidak dijumpai. Sila pastikan anda rename fail CSV anda di GitHub.")
         return pd.DataFrame()
 
-# Simpan data dalam session supaya tidak hilang bila refresh
-if 'database' not in st.session_state:
+# Simpan dalam Session State
+if 'db' not in st.session_state:
     df = load_data()
     if not df.empty:
-        # Tambah kolum tambahan yang diperlukan
-        cols = ['Siri_BIG', 'Kumpulan', 'No_Dalam_Kumpulan', 'Alahan', 'Ubat', 'No_Kecemasan', 'HP3', 'HP8_I', 'HP8_K', 'Nota']
-        for c in cols:
-            if c not in df.columns:
-                df[c] = ""
-        # Set markah permulaan 70
+        # Tambah kolum markah & profil
+        for col in ['Siri_BIG', 'Kumpulan', 'No_Dalam_Kumpulan', 'Alahan', 'Ubat', 'No_Kecemasan', 'HP3', 'HP8_I', 'HP8_K', 'Nota']:
+            df[col] = df.get(col, "")
         df[['HP3', 'HP8_I', 'HP8_K']] = [25.0, 15.0, 30.0]
-        st.session_state.database = df
+        st.session_state.db = df
 
-# --- NAVIGASI ---
-st.sidebar.title("MENU")
-mod = st.sidebar.radio("Pilih:", ["Halaman Utama", "Pelajar", "Pensyarah"])
+# --- INTERFACE ---
+st.title("🏕️ Sistem Pemarkahan BIG")
+mod = st.sidebar.radio("Menu", ["Mod Pelajar", "Mod Pensyarah", "Semak Data"])
 
-if mod == "Halaman Utama":
-    st.title("🏕️ Sistem BIG")
-    st.write("Sila pilih menu di sebelah kiri.")
+if mod == "Semak Data":
+    st.subheader("🔍 Isi Kandungan data.csv")
+    if 'db' in st.session_state:
+        st.write("Jumlah Pelajar:", len(st.session_state.db))
+        st.dataframe(st.session_state.db[['Nama_Pelajar', 'No_KP', 'Kelas']].head(10))
+    else:
+        st.error("Data kosong.")
 
-elif mod == "Pelajar":
-    st.header("📝 Mod Pelajar")
-    kp_masuk = st.text_input("Masukkan No. IC (Contoh: 60706142030)").strip()
+elif mod == "Mod Pelajar":
+    st.header("📝 Pendaftaran Profil")
+    metode = st.radio("Cari guna:", ["No. IC", "Pilih Nama dari Senarai"])
     
-    if kp_masuk:
-        db = st.session_state.database
-        # CARIAN AGRESIF: Kita cari IC yang 'ada' dalam data
-        match = db[db['No_KP'] == kp_masuk]
-        
-        if not match.empty:
-            idx = match.index[0]
-            st.success(f"Ditemui: {db.at[idx, 'Nama_Pelajar']}")
-            
-            with st.form("daftar"):
-                siri = st.selectbox("Siri BIG", [2,3,4])
-                kump = st.selectbox("Kumpulan", ["Grey", "Jingga", "Kuning", "Ungu", "Biru Gelap", "Biru", "Pink", "Coklat", "Merah", "Hijau"])
-                no_k = st.number_input("No dlm Kumpulan", 1, 20)
-                alah = st.text_input("Alahan", value=str(db.at[idx, 'Alahan']))
-                tel = st.text_input("No Tel Waris", value=str(db.at[idx, 'No_Kecemasan']))
-                
-                if st.form_submit_button("Simpan"):
-                    st.session_state.database.at[idx, 'Siri_BIG'] = siri
-                    st.session_state.database.at[idx, 'Kumpulan'] = kump
-                    st.session_state.database.at[idx, 'No_Dalam_Kumpulan'] = no_k
-                    st.session_state.database.at[idx, 'Alahan'] = alah
-                    st.session_state.database.at[idx, 'No_Kecemasan'] = tel
-                    st.success("Data Disimpan!")
-        else:
-            st.error("No. IC tidak dijumpai. Sila pastikan anda menaip nombor yang betul.")
-            with st.expander("Lihat Senarai IC dalam sistem (Guna untuk test)"):
-                st.write(db['No_KP'].head(10).tolist())
+    idx = None
+    db = st.session_state.db
 
-elif mod == "Pensyarah":
-    st.header("🎯 Mod Pensyarah")
+    if metode == "No. IC":
+        ic = st.text_input("Masukkan No. IC (Contoh: 60706142030)").strip()
+        if ic:
+            match = db[db['No_KP'] == ic]
+            if not match.empty:
+                idx = match.index[0]
+            else:
+                st.error("IC tidak dijumpai. Cuba cari guna 'Nama' di atas.")
+    else:
+        nama_pilih = st.selectbox("Pilih Nama Anda:", [""] + db['Nama_Pelajar'].tolist())
+        if nama_pilih:
+            idx = db[db['Nama_Pelajar'] == nama_pilih].index[0]
+
+    if idx is not None:
+        st.success(f"Rekod Ditemui: {db.at[idx, 'Nama_Pelajar']}")
+        with st.form("f1"):
+            kump = st.selectbox("Kumpulan:", ["Grey", "Jingga", "Kuning", "Ungu", "Biru Gelap", "Biru", "Pink", "Coklat", "Merah", "Hijau"])
+            no_k = st.number_input("No dlm Kumpulan:", 1, 20)
+            alah = st.text_input("Alahan:", value=str(db.at[idx, 'Alahan']))
+            if st.form_submit_button("Simpan"):
+                st.session_state.db.at[idx, 'Kumpulan'] = kump
+                st.session_state.db.at[idx, 'No_Dalam_Kumpulan'] = no_k
+                st.session_state.db.at[idx, 'Alahan'] = alah
+                st.success("Tersimpan!")
+
+elif mod == "Mod Pensyarah":
+    st.header("🎯 Pemarkahan")
     pw = st.sidebar.text_input("Password", type="password")
     if pw == "BIG2026":
-        # Gunakan dropdown untuk carian manual jika kod kumpulan belum diisi pelajar
-        n_list = st.session_state.database['Nama_Pelajar'].tolist()
-        pilih = st.selectbox("Cari Nama Pelajar", [""] + n_list)
-        if pilih:
-            idx = st.session_state.database[st.session_state.database['Nama_Pelajar'] == pilih].index[0]
-            p = st.session_state.database.loc[idx]
-            st.write(f"Markah: {p['Nama_Pelajar']}")
-            st.info(f"Kumpulan: {p['Kumpulan']} No: {p['No_Dalam_Kumpulan']}")
-            m1 = st.number_input("HP3 (Max 25)", 0.0, 25.0, float(p['HP3']))
-            if st.button("Simpan Markah"):
-                st.session_state.database.at[idx, 'HP3'] = m1
-                st.success("Tersimpan!")
+        nama_markah = st.selectbox("Pilih Pelajar untuk Markah:", [""] + st.session_state.db['Nama_Pelajar'].tolist())
+        if nama_markah:
+            i = st.session_state.db[st.session_state.db['Nama_Pelajar'] == nama_markah].index[0]
+            p = st.session_state.db.loc[i]
+            st.write(f"Pelajar: {p['Nama_Pelajar']} ({p['Kumpulan']} {p['No_Dalam_Kumpulan']})")
+            m = st.number_input("HP3 (Max 25)", 0.0, 25.0, float(p['HP3']))
+            if st.button("Update Markah"):
+                st.session_state.db.at[i, 'HP3'] = m
+                st.success("Markah Dikemaskini!")
+        
+        st.divider()
+        csv = st.session_state.db.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Download Hasil Akhir (CSV)", csv, "Markah_BIG.csv", "text/csv")
