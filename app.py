@@ -2,89 +2,98 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 
-# Konfigurasi UI Premium
-st.set_page_config(page_title="BIG Premium v7", layout="centered")
-
-# Styling Premium Slate/Indigo
+# 1. UI & Font Premium
+st.set_page_config(page_title="BIG Premium System", layout="centered")
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
-    .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
-    .stButton>button { background-color: #4F46E5; color: white; width: 100%; border-radius: 8px; }
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+    .stTabs [aria-selected="true"] { background-color: #6366f1 !important; color: white !important; }
+    .main-card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
     </style>
 """, unsafe_allow_html=True)
 
-# Sambungan Google Sheets
-# Pastikan Secrets di Streamlit Cloud diletakkan dengan betul
-try:
-    conn = st.connection("gsheets", type=GSheetsConnection)
-    # Gunakan query SQL ringkas untuk tarik data
-    df = conn.read(ttl=2) 
-    # Bersihkan No_KP
-    df['No_KP'] = df['No_KP'].astype(str).str.split('.').str[0].str.strip()
-except Exception as e:
-    st.error(f"Sambungan GSheets Gagal: {e}")
-    st.info("Sila pastikan 'Secrets' di Streamlit Cloud telah diisi.")
+# 2. Fungsi Sambungan GSheets yang Lebih Stabil
+def get_data():
+    try:
+        # Cuba sambung menggunakan Secrets
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        data = conn.read(ttl=2)
+        return data, None
+    except Exception as e:
+        return None, str(e)
+
+df, error_msg = get_data()
+
+# --- HEADER ---
+st.markdown("<h2 style='text-align: center; color: #1e293b;'>🏕️ BIG INTEGRATED SYSTEM</h2>", unsafe_allow_html=True)
+
+# 3. DIAGNOSTIK (Jika Error)
+if error_msg:
+    st.error("🚨 Gagal menyambung ke Google Sheets!")
+    st.info(f"Ralat Teknis: {error_msg}")
+    st.warning("Pastikan anda telah memasukkan 'Secrets' di Dashboard Streamlit Cloud.")
     st.stop()
 
-# --- MENU ---
-st.title("🏕️ BIG Live System")
-tab1, tab2 = st.tabs(["👤 Pelajar", "🎓 Pensyarah"])
+# --- MENU UTAMA ---
+tab1, tab2 = st.tabs(["👤 Kemaskini Pelajar", "🎓 Pemarkahan"])
 
-# --- MOD PELAJAR ---
 with tab1:
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    ic_input = st.text_input("Masukkan No. IC (Cth: 060214020918)")
+    st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+    ic_input = st.text_input("Log Masuk No. Kad Pengenalan (Cth: 060214020918)").strip()
     
     if ic_input:
-        match = df[df['No_KP'] == ic_input.strip()]
+        # Normalisasi IC (Buang .0 atau ruang kosong)
+        df['No_KP'] = df['No_KP'].astype(str).str.split('.').str[0].str.strip()
+        match = df[df['No_KP'] == ic_input]
+        
         if not match.empty:
             idx = match.index[0]
-            pelajar = match.iloc[0]
+            p = match.iloc[0]
             
-            # Papar Gambar jika ada
-            if pd.notna(pelajar['Url Gambar']):
-                st.image(pelajar['Url Gambar'], width=120)
-            
-            st.success(f"Nama: {pelajar['Nama_Pelajar']}")
-            
-            with st.form("pendaftaran_live"):
-                kump = st.selectbox("KUMPULAN BIG", ["Grey", "Jingga", "Kuning", "Ungu", "Biru Gelap", "Biru", "Pink", "Coklat", "Merah", "Hijau"])
-                no_k = st.number_input("No dlm Kumpulan", 1, 30, value=1)
-                alah = st.text_input("Alahan", value=str(pelajar['Alahan'] or ""))
+            # Papar Gambar & Nama
+            col_a, col_b = st.columns([1, 3])
+            with col_a:
+                img = p['Url Gambar'] if pd.notna(p['Url Gambar']) else "https://via.placeholder.com/150"
+                st.image(img, width=100)
+            with col_b:
+                st.subheader(p['Nama_Pelajar'])
+                st.write(f"ID: {p['ID_SISTEM']} | Kelas: {p['Kelas']}")
+
+            with st.form("form_pelajar"):
+                kump = st.selectbox("Kumpulan", ["Grey", "Jingga", "Kuning", "Ungu", "Biru Gelap", "Biru", "Pink", "Coklat", "Merah", "Hijau"])
+                no_k = st.number_input("No dlm Kumpulan", 1, 30, value=int(p['No Dalam Kumpulan']) if pd.notna(p['No Dalam Kumpulan']) and p['No Dalam Kumpulan'] != "" else 1)
+                alah = st.text_input("Alahan", value=str(p['Alahan'] or ""))
+                tel = st.text_input("No Tel Kecemasan", value=str(p['No tel Kecemasan'] or ""))
                 
-                if st.form_submit_button("Simpan Data ke Cloud"):
-                    # Update Dataframe
-                    df.at[idx, 'KUMPULAN BIG'] = kump
-                    df.at[idx, 'No Dalam Kumpulan'] = no_k
-                    df.at[idx, 'Alahan'] = alah
-                    
-                    # TOLAK DATA KE GOOGLE SHEETS
-                    conn.update(data=df)
-                    st.success("✅ Data Berjaya Disimpan di Google Sheets!")
-                    st.cache_data.clear()
+                if st.form_submit_button("Simpan Data Live"):
+                    try:
+                        # Update dataframe
+                        df.at[idx, 'KUMPULAN BIG'] = kump
+                        df.at[idx, 'No Dalam Kumpulan'] = no_k
+                        df.at[idx, 'Alahan'] = alah
+                        df.at[idx, 'No tel Kecemasan'] = tel
+                        
+                        # Tolak ke GSheets
+                        conn = st.connection("gsheets", type=GSheetsConnection)
+                        conn.update(data=df)
+                        st.balloons()
+                        st.success("✅ Berjaya disimpan di Google Sheets!")
+                        st.cache_data.clear()
+                    except Exception as e:
+                        st.error(f"Gagal menulis ke GSheets: {e}")
         else:
-            st.error("IC tidak dijumpai.")
+            st.error("Pelajar tidak ditemui. Sila semak No. IC.")
     st.markdown("</div>", unsafe_allow_html=True)
 
-# --- MOD PENSYARAH ---
 with tab2:
+    st.sidebar.subheader("Akses Pensyarah")
     if st.sidebar.text_input("Password", type="password") == "BIG2026":
-        st.subheader("Pemarkahan Live")
-        nama_sel = st.selectbox("Pilih Pelajar", [""] + df['Nama_Pelajar'].tolist())
-        if nama_sel:
-            p_idx = df[df['Nama_Pelajar'] == nama_sel].index[0]
-            curr_p = df.iloc[p_idx]
-            
-            new_hp3 = st.number_input("HP3 (Max 25)", 0.0, 25.0, float(curr_p['HP3'] or 25.0))
-            if st.button("Sahkan Markah"):
-                df.at[p_idx, 'HP3'] = new_hp3
-                conn.update(data=df)
-                st.success("Markah Dikemaskini!")
-                st.cache_data.clear()
-
-# --- DEBUG TAB (HANYA UNTUK ANDA) ---
-with st.sidebar.expander("🛠️ Debug Data"):
-    st.write("Senarai Kolum:", df.columns.tolist())
-    st.write("Data Mentah (3 baris):", df.head(3))
+        st.write("### Pemarkahan Amali")
+        sel_pelajar = st.selectbox("Pilih Pelajar", [""] + df['Nama_Pelajar'].tolist())
+        if sel_pelajar:
+            p_idx = df[df['Nama_Pelajar'] == sel_pelajar].index[0]
+            st.info(f"Memberi markah kepada: {sel_pelajar}")
+            # Logik markah ...
+    else:
+        st.info("Sila masukkan kata laluan untuk pemarkahan.")
