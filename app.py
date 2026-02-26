@@ -3,152 +3,105 @@ import pandas as pd
 import requests
 import json
 
-# 1. Konfigurasi Halaman
-st.set_page_config(page_title="BIG Premium v17", layout="centered")
+st.set_page_config(page_title="BIG Smart Scoring", layout="centered")
 
-# 2. UI/UX Transformation: Kuning, Slate & Indigo
+# --- CSS PREMUM (Kuning & Indigo) ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
-    
-    /* Latar Belakang & Font Global */
-    .stApp {
-        background: radial-gradient(circle at top left, #1e293b 0%, #0f172a 100%);
-        font-family: 'Inter', sans-serif;
-    }
-
-    /* Warna Tulisan Kuning untuk Label & Header */
-    h1, h2, h3, h4, label, p, .stMarkdown {
-        color: #fbbf24 !important; /* Kuning Emas */
-    }
-
-    /* Kad Kaca (Glassmorphism) */
-    .glass-card {
-        background: rgba(255, 255, 255, 0.05);
-        backdrop-filter: blur(15px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 20px;
-        padding: 2rem;
-        margin-bottom: 2rem;
-    }
-
-    /* Input Box: Teks di dalam Box tetap Putih/Hitam agar jelas */
-    input, select, textarea {
-        background-color: rgba(255, 255, 255, 0.1) !important;
-        color: white !important;
-        border-radius: 10px !important;
-    }
-
-    /* Tab Styling */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 10px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        background-color: rgba(255, 255, 255, 0.05);
-        color: #fbbf24;
-        border-radius: 10px 10px 0 0;
-        padding: 10px 20px;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #4f46e5 !important;
-        color: white !important;
-    }
-
-    /* Butang Modern */
-    .stButton>button {
-        background: linear-gradient(90deg, #fbbf24, #d97706);
-        color: #000 !important;
-        font-weight: 800;
-        border-radius: 12px;
-        border: none;
-        height: 3rem;
-        width: 100%;
-    }
+    .stApp { background: #0f172a; color: #fbbf24; font-family: 'Inter', sans-serif; }
+    .glass-card { background: rgba(255,255,255,0.05); padding: 25px; border-radius: 20px; border: 1px solid #334155; margin-bottom: 20px; }
+    h1, h2, h3, label { color: #fbbf24 !important; }
+    .stSlider > div > div > div > div { background: #fbbf24; }
+    .stButton > button { background: #fbbf24; color: black; font-weight: bold; border-radius: 12px; border: none; width: 100%; height: 3.5rem; }
     </style>
 """, unsafe_allow_html=True)
 
-# 3. Data Connection (Kekalkan URL anda)
-APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzxdLIYX82gbl0jgjFWNuQ7UPpg3hIitImIOr1ZtHRjobgfvTRby0sRyAElNv4Y69yCzw/exec"
-SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1yzQzxJcTef2pHaKHSxZroFdmgTxR3BRZrSSl_ntuHMM/gviz/tq?tqx=out:csv"
+APPS_SCRIPT_URL = "URL_APPS_SCRIPT_ANDA"
+CSV_URL = "URL_CSV_GOOGLE_SHEETS_ANDA"
 
 @st.cache_data(ttl=2)
 def load_data():
-    try:
-        df = pd.read_csv(SHEET_CSV_URL)
-        df.columns = [str(c).strip().upper() for c in df.columns]
-        ic_col = next((c for c in df.columns if "KP" in c or "IC" in c), df.columns[2])
-        df[ic_col] = df[ic_col].astype(str).str.split('.').str[0].str.strip()
-        return df, ic_col
-    except:
-        return pd.DataFrame(), None
+    df = pd.read_csv(CSV_URL)
+    df.columns = [str(c).strip().upper() for c in df.columns]
+    # Cari kolum IC
+    ic_col = next((c for c in df.columns if "KP" in c or "IC" in c), df.columns[2])
+    df[ic_col] = df[ic_col].astype(str).str.split('.').str[0].str.strip()
+    return df, ic_col
 
 df, col_ic = load_data()
 
-# --- INTERFACE UTAMA ---
-st.markdown("<h1 style='text-align: center;'>🏕️ SISTEM BIG 2026</h1>", unsafe_allow_html=True)
+st.title("🏕️ BIG MANAGEMENT SYSTEM 2026")
 
-# Menu Tab yang sangat Jelas
-menu = st.tabs(["👤 PROFIL PELAJAR", "🔑 LOG MASUK ADMIN"])
+tabs = st.tabs(["👤 Pendaftaran Profil", "🔑 Dashboard Pemarkahan"])
 
-# --- MOD PELAJAR ---
-with menu[0]:
+# --- TAB 1: PENDAFTARAN ---
+with tabs[0]:
     st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-    ic_input = st.text_input("MASUKKAN NO. IC (KUNING UNTUK JELAS):", placeholder="06XXXXXXXXXX").strip()
-    
-    if ic_input and not df.empty:
-        match = df[df[col_ic] == ic_input]
+    ic_user = st.text_input("MASUKKAN NO. IC PELAJAR:", key="ic_user")
+    if ic_user:
+        match = df[df[col_ic] == ic_user]
         if not match.empty:
             p = match.iloc[0]
-            idx = match.index[0]
-            
-            # Info Profil
-            col_img, col_info = st.columns([1, 2])
-            with col_img:
-                img_col = next((c for c in df.columns if "URL" in c or "GAMBAR" in c), None)
-                st.image(p[img_col] if img_col and pd.notna(p[img_col]) else "https://via.placeholder.com/150", width=150)
-            with col_info:
-                st.subheader(f"NAMA: {p.get('NAMA_PELAJAR', '')}")
-                st.write(f"KELAS: {p.get('KELAS', '')}")
+            st.success(f"REKOD DITEMUI: {p['NAMA_PELAJAR']}")
+            with st.form("update_profil"):
+                # (Sila masukkan field biodata seperti siri, kumpulan dsb di sini)
+                if st.form_submit_button("SIMPAN DATA PROFIL"):
+                    payload = {"type": "profile", "No_KP": ic_user, "Siri_BIG": 2} # Contoh
+                    requests.post(APPS_SCRIPT_URL, data=json.dumps(payload))
+                    st.toast("Biodata disimpan!")
+        else: st.error("IC tidak dijumpai.")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-            # Borang Kemaskini
-            with st.form("form_update_kuning"):
-                st.markdown("### 📝 KEMASKINI MAKLUMAT")
-                c1, c2 = st.columns(2)
-                with c1:
-                    new_siri = st.selectbox("SIRI BIG", [2, 3, 4])
-                    new_kump = st.selectbox("KUMPULAN", ["Grey", "Jingga", "Kuning", "Ungu", "Biru Gelap", "Biru", "Pink", "Coklat", "Merah", "Hijau"])
-                with c2:
-                    new_no = st.number_input("NO DALAM KUMPULAN", 1, 30, value=1)
-                    new_tel = st.text_input("NO TEL KECEMASAN", value=str(p.get('NO TEL KECEMASAN', '')))
+# --- TAB 2: PEMARKAHAN (ADMIN) ---
+with tabs[1]:
+    pwd = st.sidebar.text_input("KATA LALUAN ADMIN:", type="password")
+    if pwd == "BIG2026":
+        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
+        st.subheader("🎯 DASHBOARD PEMARKAHAN LIVE")
+        
+        # Pilihan Pelajar
+        pilih_nama = st.selectbox("PILIH NAMA PELAJAR UNTUK MARKAH:", [""] + df['NAMA_PELAJAR'].tolist())
+        
+        if pilih_nama:
+            target = df[df['NAMA_PELAJAR'] == pilih_nama].iloc[0]
+            ic_target = target[col_ic]
+            
+            st.info(f"Memberi markah kepada: **{pilih_nama}** ({ic_target})")
+            
+            with st.form("pemarkahan_detail"):
+                col1, col2 = st.columns(2)
                 
-                if st.form_submit_button("🚀 SIMPAN DATA KE CLOUD"):
-                    payload = {"No_KP": ic_input, "Siri_BIG": new_siri, "Kumpulan_BIG": new_kump, "No_Kumpulan": new_no, "No_Kecemasan": new_tel}
+                with col1:
+                    st.markdown("**📚 Ujian Teori (10%)**")
+                    k1 = st.number_input("Kuiz I (5%)", 0.0, 5.0, 0.0)
+                    k2 = st.number_input("Kuiz II (5%)", 0.0, 5.0, 0.0)
+                    
+                    st.markdown("**⛺ Amali I - Pra (20%)**")
+                    h4 = st.number_input("HP4 (10%)", 0.0, 10.0, 0.0)
+                    h5 = st.number_input("HP5 (10%)", 0.0, 10.0, 0.0)
+                
+                with col2:
+                    st.markdown("**⛰️ Amali II - Perkhemahan (70%)**")
+                    h3 = st.number_input("HP3 (25%)", 0.0, 25.0, 0.0)
+                    h8i = st.number_input("HP8 Individu (15%)", 0.0, 15.0, 0.0)
+                    h8k = st.number_input("HP8 Kumpulan (30%)", 0.0, 30.0, 0.0)
+                
+                total = k1 + k2 + h4 + h5 + h3 + h8i + h8k
+                st.metric("JUMLAH MARKAH KESELURUHAN", f"{total}%")
+                
+                if st.form_submit_button("SAHKAN & HANTAR MARKAH"):
+                    payload = {
+                        "type": "scoring",
+                        "No_KP": str(ic_target),
+                        "NAMA": pilih_nama,
+                        "KUIZ1": k1, "KUIZ2": k2,
+                        "HP4": h4, "HP5": h5,
+                        "HP3": h3, "HP8I": h8i, "HP8K": h8k
+                    }
                     res = requests.post(APPS_SCRIPT_URL, data=json.dumps(payload))
                     if res.status_code == 200:
-                        st.success("✅ DATA DISIMPAN!")
                         st.balloons()
-        else:
-            st.error("REKOD TIDAK DITEMUI.")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# --- MOD ADMIN (PENSYARAH) ---
-with menu[1]:
-    st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-    st.subheader("🔑 AKSES PENTADBIR")
-    pwd = st.text_input("MASUKKAN KATA LALUAN ADMIN:", type="password")
-    
-    if pwd == "BIG2026":
-        st.success("AKSES DIBENARKAN")
-        st.markdown("### 📊 DASHBOARD PEMARKAHAN")
-        
-        # Contoh Carian Admin
-        pilih_nama = st.selectbox("PILIH NAMA PELAJAR UNTUK MARKAH:", [""] + df['NAMA_PELAJAR'].tolist())
-        if pilih_nama:
-            p_idx = df[df['NAMA_PELAJAR'] == pilih_nama].index[0]
-            st.write(f"MEMBERI MARKAH KEPADA: {pilih_nama}")
-            m_hp3 = st.slider("MARKAH HP3 (25)", 0.0, 25.0, 25.0)
-            if st.button("SAHKAN MARKAH"):
-                st.toast("Markah dihantar ke Sheets!")
-    elif pwd != "":
-        st.error("KATA LALUAN SALAH!")
-    st.markdown("</div>", unsafe_allow_html=True)
+                        st.success(f"Markah {pilih_nama} berjaya dicatat ke dalam Sheet MARKAH!")
+        st.markdown("</div>", unsafe_allow_html=True)
+    else:
+        st.warning("Sila masukkan kata laluan admin di sidebar untuk akses pemarkahan.")
